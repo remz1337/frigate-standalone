@@ -1,6 +1,6 @@
 #!/bin/bash
 #Script to setup Frigate in Proxmox LXC, on a Debian 11 standard image
-#LXC config: Debian 11, 20Gb disk, 4 cores, 4Gb memory
+#LXC config: Debian 11, 20Gb disk (40Gb with TensorRT), 4 cores, 4Gb memory
 #Make sure the LXC is already set up with Nvidia drivers (and appropriate rights to the gpu)
 #Test with command: nvidia-smi
 #It should show a table with the GPU
@@ -161,6 +161,92 @@ ln -s libnvrtc.so.11.2 /usr/local/lib/python3.9/dist-packages/nvidia/cuda_nvrtc/
 ldconfig
 
 pip3 install -U /trt-wheels/*.whl
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+echo "Depoloying Frigate detector models running on Nvidia GPU"
+echo "Make sure CUDA, cuDNN and TensorRT are already installed (with updated LD_LIBRARY_PATH)"
+
+
+### Install TensorRT detector (using Nvidia GPU)
+# Avoid "LD_LIBRARY_PATH: unbound variable" by initializing the variable
+#export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+
+mkdir -p /tensorrt_models
+cd /tensorrt_models
+wget https://github.com/blakeblackshear/frigate/raw/master/docker/tensorrt_models.sh
+chmod +x tensorrt_models.sh
+
+#### NEED TO ADJUST THE tensorrt_demos files to replace TensorRT include path (it's hardcoded to v7 installed in /usr/local)
+## /tensorrt_demos/plugins/Makefile --> change INCS and LIBS paths
+
+######## MAKE SOME EDITS TO UPDATE TENSORRT PATHS
+#Create script to fix hardcoded TensorRT paths
+fix_tensorrt="$(cat << EOF
+#!/bin/bash
+sed -i 's/\/usr\/local\/TensorRT-7.1.3.4/\/tensorrt\/TensorRT-8.6.1.6/g' /tensorrt_demos/plugins/Makefile
+EOF
+)"
+
+echo "${fix_tensorrt}" > /tensorrt_models/fix_tensorrt.sh
+
+#insert after this line :git clone --depth 1 https://github.com/yeahme49/tensorrt_demos.git /tensorrt_demos
+sed -i '18 i bash \/tensorrt_models\/fix_tensorrt.sh' tensorrt_models.sh
+
+#apt install python
+apt install python-is-python3
+
+#bash /tensorrt_models/tensorrt_models.sh
+./tensorrt_models.sh
+
+
+############ NEED TO DEPLOY LIBYOLO FOR FRIGATE
+cp /tensorrt_models/libyolo_layer.so /usr/local/lib/
+
+
+#+ add /usr/local/cuda-12.2/targets/x86_64-linux/lib to LD_LIBRARY_PATH
+
+#MAYBE FRIGATE IS LOOKING IN /trt-models INSTEAD OF /tensorrt_models?
+
+mv /tensorrt_models /trt-models
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### BUILD COMPLETE, NOW INITIALIZE
 

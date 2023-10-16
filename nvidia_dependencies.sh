@@ -3,7 +3,7 @@
 
 
 
-apt install build-essential software-properties-common
+apt install build-essential software-properties-common python3-pip python-is-python3
 
 #Download CUDA (for Debian 11 runfile)
 #https://developer.nvidia.com/cuda-downloads
@@ -24,15 +24,19 @@ sh cuda_12.2.2_535.104.05_linux.run
 
 #INSTALL CUDNN
 #Need to find the download link using the link redirect trace browser extension
-wget -O cudnn-local-repo-debian11-8.9.5.29_1.0-1_amd64.deb 'https://developer.download.nvidia.com/compute/cudnn/secure/8.9.5/local_installers/12.x/cudnn-local-repo-debian11-8.9.5.29_1.0-1_amd64.deb?EnYNwTbHpTfjEcaFvZsaIvlwQWN8-eh-49I5QFdLLCpFrCewjyEIS6CbBS4vRA9o848okz9qT-94lGGLKAA6XbBX8kfWSjP9xumm8-bsuhAmtS-Y7vT3YTJzE7ceRLgfHh2ftUYON4YKSiMlM98TEyQthoRhpOUkeLCvCavHhUztU--X7N2xUdCxrEkkvcr7uE-A3dD1sCogP6DuCq44Qp7l&t=eyJscyI6ImdzZW8iLCJsc2QiOiJodHRwczovL3d3dy5nb29nbGUuY29tLyJ9'
+#wget -O cudnn-local-repo-debian11-8.9.5.29_1.0-1_amd64.deb 'https://developer.download.nvidia.com/compute/cudnn/secure/8.9.5/local_installers/12.x/cudnn-local-repo-debian11-8.9.5.29_1.0-1_amd64.deb?EnYNwTbHpTfjEcaFvZsaIvlwQWN8-eh-49I5QFdLLCpFrCewjyEIS6CbBS4vRA9o848okz9qT-94lGGLKAA6XbBX8kfWSjP9xumm8-bsuhAmtS-Y7vT3YTJzE7ceRLgfHh2ftUYON4YKSiMlM98TEyQthoRhpOUkeLCvCavHhUztU--X7N2xUdCxrEkkvcr7uE-A3dD1sCogP6DuCq44Qp7l&t=eyJscyI6ImdzZW8iLCJsc2QiOiJodHRwczovL3d3dy5nb29nbGUuY29tLyJ9'
+wget https://developer.download.nvidia.com/compute/redist/cudnn/v8.8.0/local_installers/12.0/cudnn-local-repo-debian11-8.8.0.121_1.0-1_amd64.deb
 
-dpkg -i cudnn-local-repo-debian11-8.9.5.29_1.0-1_amd64.deb
-cp /var/cudnn-local-repo-debian11-8.9.5.29/cudnn-local-461E8853-keyring.gpg /usr/share/keyrings/
+dpkg -i cudnn-local-repo-debian11-8.8.0.121_1.0-1_amd64.deb
+#cp /var/cudnn-local-repo-debian11-8.9.5.29/cudnn-local-461E8853-keyring.gpg /usr/share/keyrings/
+cp /var/cudnn-local-repo-debian11-8.8.0.121/cudnn-local-7913C671-keyring.gpg /usr/share/keyrings/
 
 apt update
 
-apt install libcudnn8=8.9.5.29-1+cuda12.2
-apt install libcudnn8-dev=8.9.5.29-1+cuda12.2
+#apt install libcudnn8=8.9.5.29-1+cuda12.2
+#apt install libcudnn8-dev=8.9.5.29-1+cuda12.2
+apt install libcudnn8=8.8.0.121-1+cuda12.0
+apt install libcudnn8-dev=8.8.0.121-1+cuda12.0
 
 
 

@@ -220,10 +220,8 @@ echo "${fix_tensorrt}" > /opt/frigate/fix_tensorrt.sh
 #sed -i '18 i bash \/tensorrt_models\/fix_tensorrt.sh' tensorrt_models.sh
 sed -i '9 i bash \/opt\/frigate\/fix_tensorrt.sh' /opt/frigate/docker/tensorrt/detector/tensorrt_libyolo.sh
 
-#apt install python
-apt install python-is-python3
-
-apt install g++
+#apt install python and g++
+apt install -y python-is-python3 g++
 /opt/frigate/docker/tensorrt/detector/tensorrt_libyolo.sh
 
 

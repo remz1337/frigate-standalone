@@ -17,10 +17,14 @@
 #Command to launch script:
 #wget -O- https://raw.githubusercontent.com/remz1337/frigate/dev/standalone_install.sh | bash -
 
-echo "Installing Frigate stack..."
+echo "Installing Frigate stack (v0.13.0-beta2)"
 
 #Run everything as root
-sudo su
+#sudo su
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
 
 #Configuration to make unattended installs with APT
 #https://serverfault.com/questions/48724/100-non-interactive-debian-dist-upgrade
@@ -37,20 +41,23 @@ apt upgrade -y
 apt install -y git automake build-essential wget xz-utils
 
 #Pull Frigate from  repo
-git clone https://github.com/blakeblackshear/frigate.git
+#git clone https://github.com/blakeblackshear/frigate.git
+wget https://github.com/blakeblackshear/frigate/archive/refs/tags/v0.13.0-beta2.tar.gz -O frigate.tar.gz
+mkdir frigate
+tar -xzf frigate.tar.gz -C frigate --strip-components 1
 
 cd /opt/frigate
 
 #Used in build dependencies scripts
 export TARGETARCH=amd64
 
-docker/build_nginx.sh
+docker/main/build_nginx.sh
 
 
 mkdir -p /usr/local/go2rtc/bin
 cd /usr/local/go2rtc/bin
 
-wget -O go2rtc "https://github.com/AlexxIT/go2rtc/releases/download/v1.5.0/go2rtc_linux_${TARGETARCH}"
+wget -O go2rtc "https://github.com/AlexxIT/go2rtc/releases/download/v1.8.1/go2rtc_linux_${TARGETARCH}"
 chmod +x go2rtc
 
 cd /opt/frigate
@@ -59,7 +66,7 @@ cd /opt/frigate
 apt install -y wget python3 python3-distutils 
 wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py
 python3 get-pip.py "pip"
-pip install -r requirements-ov.txt
+pip install -r docker/main/requirements-ov.txt
 
 
 # Get OpenVino Model
@@ -70,25 +77,28 @@ cd /opt/frigate/models && omz_converter --name ssdlite_mobilenet_v2 --precision 
 # Build libUSB without udev.  Needed for Openvino NCS2 support
 cd /opt/frigate
 
-apt install -y unzip build-essential automake libtool
+export CCACHE_DIR=/root/.ccache
+export CCACHE_MAXSIZE=2G
 
-wget https://github.com/libusb/libusb/archive/v1.0.25.zip -O v1.0.25.zip
-unzip v1.0.25.zip
-cd libusb-1.0.25
+apt install -y unzip build-essential automake libtool ccache pkg-config
+
+wget https://github.com/libusb/libusb/archive/v1.0.26.zip -O v1.0.26.zip
+unzip v1.0.26.zip
+cd libusb-1.0.26
 ./bootstrap.sh
 ./configure --disable-udev --enable-shared
 make -j $(nproc --all)
 
 apt install -y --no-install-recommends libusb-1.0-0-dev
 
-cd /opt/frigate/libusb-1.0.25/libusb
+cd /opt/frigate/libusb-1.0.26/libusb
 
 mkdir -p /usr/local/lib
 /bin/bash ../libtool  --mode=install /usr/bin/install -c libusb-1.0.la '/usr/local/lib'
 mkdir -p /usr/local/include/libusb-1.0
 /usr/bin/install -c -m 644 libusb.h '/usr/local/include/libusb-1.0'
 mkdir -p /usr/local/lib/pkgconfig
-cd /opt/frigate/libusb-1.0.25/
+cd /opt/frigate/libusb-1.0.26/
 /usr/bin/install -c -m 644 libusb-1.0.pc '/usr/local/lib/pkgconfig'
 ldconfig
 
@@ -106,25 +116,29 @@ cp -r /opt/frigate/models/public/ssdlite_mobilenet_v2/FP16 openvino-model
 
 wget https://github.com/openvinotoolkit/open_model_zoo/raw/master/data/dataset_classes/coco_91cl_bkgr.txt -O openvino-model/coco_91cl_bkgr.txt
 sed -i 's/truck/car/g' openvino-model/coco_91cl_bkgr.txt
+# Get Audio Model and labels
+wget -qO cpu_audio_model.tflite https://tfhub.dev/google/lite-model/yamnet/classification/tflite/1?lite-format=tflite
+cp /opt/frigate/audio-labelmap.txt /audio-labelmap.txt
+
 
 # opencv & scipy dependencies
 cd /opt/frigate
 
 apt install -y python3 python3-dev wget build-essential cmake git pkg-config libgtk-3-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev gfortran openexr libatlas-base-dev libssl-dev libtbb2 libtbb-dev libdc1394-22-dev libopenexr-dev libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev gcc gfortran libopenblas-dev liblapack-dev
 
-pip3 install -r requirements.txt
+pip3 install -r docker/main/requirements.txt
 
-pip3 wheel --wheel-dir=/wheels -r /opt/frigate/requirements-wheels.txt
-pip3 wheel --wheel-dir=/trt-wheels -r /opt/frigate/requirements-tensorrt.txt
+pip3 wheel --wheel-dir=/wheels -r /opt/frigate/docker/main/requirements-wheels.txt
+#pip3 wheel --wheel-dir=/trt-wheels -r /opt/frigate/docker/tensorrt/requirements-amd64.txt
 
 #Copy preconfigured files
-cp -a /opt/frigate/docker/rootfs/. /
+cp -a /opt/frigate/docker/main/rootfs/. /
 
 #exports are lost upon system reboot...
 #export PATH="$PATH:/usr/lib/btbn-ffmpeg/bin:/usr/local/go2rtc/bin:/usr/local/nginx/sbin"
 
 # Install dependencies
-/opt/frigate/docker/install_deps.sh
+/opt/frigate/docker/main/install_deps.sh
 
 #Create symbolic links to ffmpeg and go2rtc
 ln -svf /usr/lib/btbn-ffmpeg/bin/ffmpeg /usr/local/bin/ffmpeg
@@ -140,7 +154,7 @@ wget -O- https://deb.nodesource.com/setup_16.x | bash -
 apt install -y nodejs 
 npm install -g npm@9
 
-pip3 install -r /opt/frigate/requirements-dev.txt
+pip3 install -r /opt/frigate/docker/main/requirements-dev.txt
 
 # Frigate web build
 # This should be architecture agnostic, so speed up the build on multiarch by not using QEMU.
@@ -156,31 +170,17 @@ cd /opt/frigate/
 
 cp -r /opt/frigate/web/dist/* /opt/frigate/web/
 
+
+################ BUILDING TENSORRT
+
+pip3 wheel --wheel-dir=/trt-wheels -r /opt/frigate/docker/tensorrt/requirements-amd64.txt
 pip3 install -U /trt-wheels/*.whl
-ln -s libnvrtc.so.11.2 /usr/local/lib/python3.9/dist-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so
+#ln -s libnvrtc.so.11.2 /usr/local/lib/python3.9/dist-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so
 ldconfig
 
-pip3 install -U /trt-wheels/*.whl
+#pip3 install -U /trt-wheels/*.whl
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+cp -a /opt/frigate/docker/tensorrt/detector/rootfs/. /
 
 
 echo "Depoloying Frigate detector models running on Nvidia GPU"
@@ -191,58 +191,47 @@ echo "Make sure CUDA, cuDNN and TensorRT are already installed (with updated LD_
 # Avoid "LD_LIBRARY_PATH: unbound variable" by initializing the variable
 #export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
-mkdir -p /tensorrt_models
-cd /tensorrt_models
-wget https://github.com/blakeblackshear/frigate/raw/master/docker/tensorrt_models.sh
-chmod +x tensorrt_models.sh
+################################# THIS IS OUTDATED, FRIGATE v0.13 HAS A S6 RUN SCRIPT TO BUILD TENSORRT DEMOS
+#mkdir -p /tensorrt_models
+#cd /tensorrt_models
+#wget https://github.com/blakeblackshear/frigate/raw/master/docker/tensorrt_models.sh
+#chmod +x tensorrt_models.sh
+#######################################################################
 
-#### NEED TO ADJUST THE tensorrt_demos files to replace TensorRT include path (it's hardcoded to v7 installed in /usr/local)
+mkdir -p /usr/local/src/tensorrt_demos
+cd /usr/local/src
+
+
+#### Need to adjust the tensorrt_demos files to replace TensorRT include path (it's hardcoded to v7 installed in /usr/local)
 ## /tensorrt_demos/plugins/Makefile --> change INCS and LIBS paths
 
 ######## MAKE SOME EDITS TO UPDATE TENSORRT PATHS
 #Create script to fix hardcoded TensorRT paths
 fix_tensorrt="$(cat << EOF
 #!/bin/bash
-sed -i 's/\/usr\/local\/TensorRT-7.1.3.4/\/tensorrt\/TensorRT-8.6.1.6/g' /tensorrt_demos/plugins/Makefile
+sed -i 's/\/usr\/local\/TensorRT-7.1.3.4/\/tensorrt\/TensorRT-8.6.1.6/g' /usr/local/src/tensorrt_demos/plugins/Makefile
 EOF
 )"
 
-echo "${fix_tensorrt}" > /tensorrt_models/fix_tensorrt.sh
+#echo "${fix_tensorrt}" > /usr/local/src/tensorrt_demos/fix_tensorrt.sh
+echo "${fix_tensorrt}" > /opt/frigate/fix_tensorrt.sh
 
 #insert after this line :git clone --depth 1 https://github.com/yeahme49/tensorrt_demos.git /tensorrt_demos
-sed -i '18 i bash \/tensorrt_models\/fix_tensorrt.sh' tensorrt_models.sh
+#sed -i '18 i bash \/tensorrt_models\/fix_tensorrt.sh' tensorrt_models.sh
+sed -i '9 i bash \/opt\/frigate\/fix_tensorrt.sh' /opt/frigate/docker/tensorrt/detector/tensorrt_libyolo.sh
 
 #apt install python
 apt install python-is-python3
 
-#bash /tensorrt_models/tensorrt_models.sh
-./tensorrt_models.sh
+apt install g++
+/opt/frigate/docker/tensorrt/detector/tensorrt_libyolo.sh
 
 
-############ NEED TO DEPLOY LIBYOLO FOR FRIGATE
-cp /tensorrt_models/libyolo_layer.so /usr/local/lib/
-
-
-#+ add /usr/local/cuda-12.2/targets/x86_64-linux/lib to LD_LIBRARY_PATH
-
-#MAYBE FRIGATE IS LOOKING IN /trt-models INSTEAD OF /tensorrt_models?
-
-mv /tensorrt_models /trt-models
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### NEED TO BUILD THE TRT MODELS
+cd /opt/frigate
+export YOLO_MODELS="yolov4-tiny-288,yolov4-tiny-416,yolov7-tiny-416"
+export TRT_VER=8.5.3
+bash /opt/frigate/docker/tensorrt/detector/rootfs/etc/s6-overlay/s6-rc.d/trt-model-prepare/run
 
 
 
@@ -317,7 +306,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=bash /opt/frigate/docker/rootfs/etc/s6-overlay/s6-rc.d/go2rtc/run
+ExecStart=bash /opt/frigate/docker/main/rootfs/etc/s6-overlay/s6-rc.d/go2rtc/run
 
 [Install]
 WantedBy=multi-user.target
@@ -337,9 +326,10 @@ sleep 3
 #http://<machine_ip>:1984/
 
 
+
 ### Starting Frigate
 #First, comment the call to S6 in the run script
-sed -i '/^s6-svc -O \.$/s/^/#/' /opt/frigate/docker/rootfs/etc/s6-overlay/s6-rc.d/frigate/run
+sed -i '/^s6-svc -O \.$/s/^/#/' /opt/frigate/docker/main/rootfs/etc/s6-overlay/s6-rc.d/frigate/run
 
 #Second, install yq, needed by script to check database path
 wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
@@ -358,7 +348,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=bash /opt/frigate/docker/rootfs/etc/s6-overlay/s6-rc.d/frigate/run
+ExecStart=bash /opt/frigate/docker/main/rootfs/etc/s6-overlay/s6-rc.d/frigate/run
 
 [Install]
 WantedBy=multi-user.target
@@ -378,7 +368,7 @@ sleep 3
 
 ## Call nginx from absolute path
 ## nginx --> /usr/local/nginx/sbin/nginx
-sed -i 's/exec nginx/exec \/usr\/local\/nginx\/sbin\/nginx/g' /opt/frigate/docker/rootfs/etc/s6-overlay/s6-rc.d/nginx/run
+sed -i 's/exec nginx/exec \/usr\/local\/nginx\/sbin\/nginx/g' /opt/frigate/docker/main/rootfs/etc/s6-overlay/s6-rc.d/nginx/run
 
 #Can't log to /dev/stdout with systemd, so log to file
 sed -i 's/error_log \/dev\/stdout warn\;/error_log nginx\.err warn\;/' /usr/local/nginx/conf/nginx.conf
@@ -397,7 +387,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=bash /opt/frigate/docker/rootfs/etc/s6-overlay/s6-rc.d/nginx/run
+ExecStart=bash /opt/frigate/docker/main/rootfs/etc/s6-overlay/s6-rc.d/nginx/run
 
 [Install]
 WantedBy=multi-user.target

@@ -17,6 +17,9 @@
 #Command to launch script:
 #wget -O- https://raw.githubusercontent.com/remz1337/frigate/dev/standalone_install.sh | bash -
 
+#Flag to deploy Frigate with TensorRT, assuming Nvidia GPU with dependencies already installed. 0=disabled (default), 1=enabled
+USE_TENSORRT=0
+
 echo "Installing Frigate stack (v0.13.0-beta2)"
 
 #Run everything as root
@@ -63,14 +66,14 @@ chmod +x go2rtc
 cd /opt/frigate
 
 ### OpenVino
-apt install -y wget python3 python3-distutils 
+apt install -y wget python3 python3-distutils
 wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py
 python3 get-pip.py "pip"
 pip install -r docker/main/requirements-ov.txt
 
 
 # Get OpenVino Model
-mkdir -p /opt/frigate/models 
+mkdir -p /opt/frigate/models
 cd /opt/frigate/models && omz_downloader --name ssdlite_mobilenet_v2
 cd /opt/frigate/models && omz_converter --name ssdlite_mobilenet_v2 --precision FP16
 
@@ -151,7 +154,7 @@ ldconfig
 # Install Node 16
 wget -O- https://deb.nodesource.com/setup_16.x | bash -
 
-apt install -y nodejs 
+apt install -y nodejs
 npm install -g npm@9
 
 pip3 install -r /opt/frigate/docker/main/requirements-dev.txt
@@ -171,6 +174,7 @@ cd /opt/frigate/
 cp -r /opt/frigate/web/dist/* /opt/frigate/web/
 
 
+if [[ "$USE_TENSORRT" == 1 ]]; then
 ################ BUILDING TENSORRT
 
 pip3 wheel --wheel-dir=/trt-wheels -r /opt/frigate/docker/tensorrt/requirements-amd64.txt
@@ -231,6 +235,8 @@ export YOLO_MODELS="yolov4-tiny-288,yolov4-tiny-416,yolov7-tiny-416"
 export TRT_VER=8.5.3
 bash /opt/frigate/docker/tensorrt/detector/rootfs/etc/s6-overlay/s6-rc.d/trt-model-prepare/run
 
+#End conditional block for TensorRT
+fi
 
 
 
@@ -313,7 +319,7 @@ EOF
 )"
 
 echo "${go2rtc_service}" > /etc/systemd/system/go2rtc.service
-	
+
 systemctl start go2rtc
 systemctl enable go2rtc
 
@@ -355,7 +361,7 @@ EOF
 )"
 
 echo "${frigate_service}" > /etc/systemd/system/frigate.service
-	
+
 systemctl start frigate
 systemctl enable frigate
 
@@ -394,7 +400,7 @@ EOF
 )"
 
 echo "${nginx_service}" > /etc/systemd/system/nginx.service
-	
+
 systemctl start nginx
 systemctl enable nginx
 

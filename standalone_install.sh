@@ -152,10 +152,16 @@ pip3 install -U /wheels/*.whl
 ldconfig
 
 # Install Node 16
-wget -O- https://deb.nodesource.com/setup_16.x | bash -
+#wget -O- https://deb.nodesource.com/setup_16.x | bash -
+
+# Install Node 21
+#curl -fsSL https://deb.nodesource.com/setup_21.x | sudo -E bash -
+#sudo apt-get install -y nodejs
+curl -fsSL https://deb.nodesource.com/setup_21.x | bash -
 
 apt install -y nodejs
-npm install -g npm@9
+#npm install -g npm@9
+npm install -g npm
 
 pip3 install -r /opt/frigate/docker/main/requirements-dev.txt
 

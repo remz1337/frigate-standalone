@@ -5,6 +5,12 @@
 
 apt install build-essential software-properties-common python3-pip python-is-python3
 
+
+##### Try with available package, not sure which version it gives:
+#sudo apt install nvidia-cuda-toolkit
+
+
+
 #Download CUDA (for Debian 11 runfile)
 #https://developer.nvidia.com/cuda-downloads
 

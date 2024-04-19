@@ -1,3 +1,5 @@
+# This script is in the process of being integrated into my fork of Tteck's Proxmox Helper Scripts [here](https://github.com/remz1337/Proxmox).
+
 # frigate-standalone
 Bash script to deploy Frigate NVR, without the need for Docker.
 
